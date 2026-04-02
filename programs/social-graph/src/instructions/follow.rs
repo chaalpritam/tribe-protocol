@@ -3,20 +3,17 @@ use crate::state::{SocialProfile, Link};
 use crate::errors::SocialGraphError;
 use crate::events::Followed;
 
-use super::init_profile::FidRecord;
+use super::init_profile::deserialize_fid_record;
 
 #[derive(Accounts)]
 pub struct Follow<'info> {
-    /// Follower's FID record — proves custody ownership.
-    #[account(
-        constraint = follower_fid_record.custody_address == custody.key() @ SocialGraphError::UnauthorizedCustody,
-    )]
-    pub follower_fid_record: Account<'info, FidRecord>,
+    /// CHECK: Cross-program FID record from fid-registry. Validated in handler.
+    pub follower_fid_record: UncheckedAccount<'info>,
 
     /// Follower's social profile — following_count incremented.
     #[account(
         mut,
-        seeds = [b"social_profile", follower_fid_record.fid.to_le_bytes().as_ref()],
+        seeds = [b"social_profile", &follower_fid_record.try_borrow_data()?[8..16]],
         bump = follower_profile.bump,
     )]
     pub follower_profile: Account<'info, SocialProfile>,
@@ -36,7 +33,7 @@ pub struct Follow<'info> {
         space = Link::SIZE,
         seeds = [
             b"link",
-            follower_fid_record.fid.to_le_bytes().as_ref(),
+            &follower_fid_record.try_borrow_data()?[8..16],
             following_profile.fid.to_le_bytes().as_ref(),
         ],
         bump,
@@ -50,7 +47,10 @@ pub struct Follow<'info> {
 }
 
 pub fn handler(ctx: Context<Follow>) -> Result<()> {
-    let follower_fid = ctx.accounts.follower_fid_record.fid;
+    let fid_data = deserialize_fid_record(&ctx.accounts.follower_fid_record)?;
+    require!(fid_data.custody_address == ctx.accounts.custody.key(), SocialGraphError::UnauthorizedCustody);
+
+    let follower_fid = fid_data.fid;
     let following_fid = ctx.accounts.following_profile.fid;
 
     require!(follower_fid != following_fid, SocialGraphError::CannotFollowSelf);

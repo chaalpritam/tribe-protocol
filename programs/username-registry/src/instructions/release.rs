@@ -3,15 +3,12 @@ use crate::state::{UsernameRecord, FidUsername};
 use crate::errors::UsernameError;
 use crate::events::UsernameReleased;
 
-use super::register::FidRecord;
+use super::register::deserialize_fid_record;
 
 #[derive(Accounts)]
 pub struct ReleaseUsername<'info> {
-    #[account(
-        constraint = fid_record.custody_address == custody.key() @ UsernameError::UnauthorizedCustody,
-        constraint = fid_record.fid == username_record.fid @ UsernameError::UnauthorizedCustody,
-    )]
-    pub fid_record: Account<'info, FidRecord>,
+    /// CHECK: Cross-program FID record from fid-registry. Validated in handler.
+    pub fid_record: UncheckedAccount<'info>,
 
     #[account(
         mut,
@@ -21,7 +18,7 @@ pub struct ReleaseUsername<'info> {
 
     #[account(
         mut,
-        seeds = [b"fid_username", fid_record.fid.to_le_bytes().as_ref()],
+        seeds = [b"fid_username", &fid_record.try_borrow_data()?[8..16]],
         bump = fid_username.bump,
         close = custody,
     )]
@@ -32,10 +29,16 @@ pub struct ReleaseUsername<'info> {
 }
 
 pub fn handler(ctx: Context<ReleaseUsername>) -> Result<()> {
+    let fid_data = deserialize_fid_record(&ctx.accounts.fid_record)?;
+    require!(fid_data.custody_address == ctx.accounts.custody.key(), UsernameError::UnauthorizedCustody);
+    require!(fid_data.fid == ctx.accounts.username_record.fid, UsernameError::UnauthorizedCustody);
+
     let record = &ctx.accounts.username_record;
+    let username_bytes = &record.username[..record.username_len as usize];
+    let username = String::from_utf8_lossy(username_bytes).to_string();
 
     emit!(UsernameReleased {
-        username: record.username_str().to_string(),
+        username,
         fid: record.fid,
     });
 

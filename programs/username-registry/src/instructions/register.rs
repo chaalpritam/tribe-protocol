@@ -3,23 +3,27 @@ use crate::state::{UsernameRecord, FidUsername, MAX_USERNAME_LEN, REGISTRATION_D
 use crate::errors::UsernameError;
 use crate::events::UsernameRegistered;
 
-/// FID record from fid-registry (cross-program read).
-#[account]
-pub struct FidRecord {
+pub const FID_REGISTRY_ID: Pubkey = pubkey!("4BSmJmRGQWKgioP9DG2bUuRS9U3V6soRauU7Nv6yGvHD");
+
+pub struct FidRecordData {
     pub fid: u64,
     pub custody_address: Pubkey,
-    pub recovery_address: Pubkey,
-    pub registered_at: i64,
-    pub bump: u8,
+}
+
+pub fn deserialize_fid_record(info: &AccountInfo) -> Result<FidRecordData> {
+    require!(*info.owner == FID_REGISTRY_ID, UsernameError::UnauthorizedCustody);
+    let data = info.try_borrow_data()?;
+    require!(data.len() >= 8 + 8 + 32, UsernameError::UnauthorizedCustody);
+    let fid = u64::from_le_bytes(data[8..16].try_into().unwrap());
+    let custody_address = Pubkey::try_from(&data[16..48]).unwrap();
+    Ok(FidRecordData { fid, custody_address })
 }
 
 #[derive(Accounts)]
 #[instruction(username: String)]
 pub struct RegisterUsername<'info> {
-    #[account(
-        constraint = fid_record.custody_address == custody.key() @ UsernameError::UnauthorizedCustody,
-    )]
-    pub fid_record: Account<'info, FidRecord>,
+    /// CHECK: Cross-program FID record from fid-registry. Validated in handler.
+    pub fid_record: UncheckedAccount<'info>,
 
     #[account(
         init,
@@ -34,7 +38,7 @@ pub struct RegisterUsername<'info> {
         init,
         payer = custody,
         space = FidUsername::SIZE,
-        seeds = [b"fid_username", fid_record.fid.to_le_bytes().as_ref()],
+        seeds = [b"fid_username", &fid_record.try_borrow_data()?[8..16]],
         bump,
     )]
     pub fid_username: Account<'info, FidUsername>,
@@ -53,6 +57,9 @@ pub fn handler(ctx: Context<RegisterUsername>, username: String) -> Result<()> {
         UsernameError::InvalidCharacters
     );
 
+    let fid_data = deserialize_fid_record(&ctx.accounts.fid_record)?;
+    require!(fid_data.custody_address == ctx.accounts.custody.key(), UsernameError::UnauthorizedCustody);
+
     let now = Clock::get()?.unix_timestamp;
     let username_bytes = username.as_bytes();
     let username_hash = anchor_lang::solana_program::hash::hash(username.to_lowercase().as_bytes()).to_bytes();
@@ -62,7 +69,7 @@ pub fn handler(ctx: Context<RegisterUsername>, username: String) -> Result<()> {
     name_buf[..username_bytes.len()].copy_from_slice(username_bytes);
     record.username = name_buf;
     record.username_len = username_bytes.len() as u8;
-    record.fid = ctx.accounts.fid_record.fid;
+    record.fid = fid_data.fid;
     record.registered_at = now;
     record.expiry = now + REGISTRATION_DURATION;
     record.bump = ctx.bumps.username_record;

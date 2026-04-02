@@ -3,16 +3,12 @@ use crate::state::UsernameRecord;
 use crate::errors::UsernameError;
 use crate::events::UsernameTransferred;
 
-use super::register::FidRecord;
+use super::register::deserialize_fid_record;
 
 #[derive(Accounts)]
 pub struct TransferUsername<'info> {
-    /// Current owner's FID record.
-    #[account(
-        constraint = fid_record.custody_address == custody.key() @ UsernameError::UnauthorizedCustody,
-        constraint = fid_record.fid == username_record.fid @ UsernameError::UnauthorizedCustody,
-    )]
-    pub fid_record: Account<'info, FidRecord>,
+    /// CHECK: Cross-program FID record from fid-registry. Validated in handler.
+    pub fid_record: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub username_record: Account<'info, UsernameRecord>,
@@ -21,6 +17,10 @@ pub struct TransferUsername<'info> {
 }
 
 pub fn handler(ctx: Context<TransferUsername>, new_fid: u64) -> Result<()> {
+    let fid_data = deserialize_fid_record(&ctx.accounts.fid_record)?;
+    require!(fid_data.custody_address == ctx.accounts.custody.key(), UsernameError::UnauthorizedCustody);
+    require!(fid_data.fid == ctx.accounts.username_record.fid, UsernameError::UnauthorizedCustody);
+
     let record = &mut ctx.accounts.username_record;
     let now = Clock::get()?.unix_timestamp;
     require!(!record.is_expired(now), UsernameError::Expired);

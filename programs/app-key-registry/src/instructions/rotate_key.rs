@@ -3,20 +3,18 @@ use crate::state::AppKeyRecord;
 use crate::errors::AppKeyError;
 use crate::events::AppKeyRotated;
 
-use super::add_key::FidRecord;
+use super::add_key::deserialize_fid_record;
 
 #[derive(Accounts)]
 #[instruction(new_app_pubkey: Pubkey)]
 pub struct RotateAppKey<'info> {
-    #[account(
-        constraint = fid_record.custody_address == custody.key() @ AppKeyError::UnauthorizedCustody,
-    )]
-    pub fid_record: Account<'info, FidRecord>,
+    /// CHECK: Cross-program FID record from fid-registry. Validated in handler.
+    pub fid_record: UncheckedAccount<'info>,
 
     /// Old app key — will be marked revoked.
     #[account(
         mut,
-        seeds = [b"app_key", fid_record.fid.to_le_bytes().as_ref(), old_app_key_record.app_pubkey.as_ref()],
+        seeds = [b"app_key", &fid_record.try_borrow_data()?[8..16], old_app_key_record.app_pubkey.as_ref()],
         bump = old_app_key_record.bump,
         constraint = !old_app_key_record.revoked @ AppKeyError::AlreadyRevoked,
     )]
@@ -27,7 +25,7 @@ pub struct RotateAppKey<'info> {
         init,
         payer = custody,
         space = AppKeyRecord::SIZE,
-        seeds = [b"app_key", fid_record.fid.to_le_bytes().as_ref(), new_app_pubkey.as_ref()],
+        seeds = [b"app_key", &fid_record.try_borrow_data()?[8..16], new_app_pubkey.as_ref()],
         bump,
     )]
     pub new_app_key_record: Account<'info, AppKeyRecord>,
@@ -46,12 +44,15 @@ pub fn handler(
 ) -> Result<()> {
     require!(scope <= 3, AppKeyError::InvalidScope);
 
+    let fid_data = deserialize_fid_record(&ctx.accounts.fid_record)?;
+    require!(fid_data.custody_address == ctx.accounts.custody.key(), AppKeyError::UnauthorizedCustody);
+
     let old = &mut ctx.accounts.old_app_key_record;
     let old_pubkey = old.app_pubkey;
     old.revoked = true;
 
     let new = &mut ctx.accounts.new_app_key_record;
-    new.fid = ctx.accounts.fid_record.fid;
+    new.fid = fid_data.fid;
     new.app_pubkey = new_app_pubkey;
     new.scope = scope;
     new.created_at = Clock::get()?.unix_timestamp;
