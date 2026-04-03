@@ -20,7 +20,7 @@ pub struct Initialize<'info> {
 
 pub fn handler(ctx: Context<Initialize>) -> Result<()> {
     let state = &mut ctx.accounts.global_state;
-    state.fid_counter = 0;
+    state.tid_counter = 0;
     state.authority = ctx.accounts.authority.key();
     state.bump = ctx.bumps.global_state;
     Ok(())

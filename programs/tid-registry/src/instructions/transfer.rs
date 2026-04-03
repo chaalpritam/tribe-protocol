@@ -1,17 +1,17 @@
 use anchor_lang::prelude::*;
-use crate::state::{FidRecord, CustodyLookup};
-use crate::errors::FidError;
-use crate::events::FidTransferred;
+use crate::state::{TidRecord, CustodyLookup};
+use crate::errors::TidError;
+use crate::events::TidTransferred;
 
 #[derive(Accounts)]
 pub struct Transfer<'info> {
     #[account(
         mut,
-        seeds = [b"fid", fid_record.fid.to_le_bytes().as_ref()],
-        bump = fid_record.bump,
-        constraint = fid_record.custody_address == custody.key() @ FidError::UnauthorizedCustody,
+        seeds = [b"tid", tid_record.tid.to_le_bytes().as_ref()],
+        bump = tid_record.bump,
+        constraint = tid_record.custody_address == custody.key() @ TidError::UnauthorizedCustody,
     )]
-    pub fid_record: Account<'info, FidRecord>,
+    pub tid_record: Account<'info, TidRecord>,
 
     /// Old custody lookup — will be closed.
     #[account(
@@ -42,19 +42,19 @@ pub struct Transfer<'info> {
 }
 
 pub fn handler(ctx: Context<Transfer>, new_custody: Pubkey) -> Result<()> {
-    let record = &mut ctx.accounts.fid_record;
+    let record = &mut ctx.accounts.tid_record;
     let old_custody = record.custody_address;
 
-    require_keys_neq!(old_custody, new_custody, FidError::SameCustodyAddress);
+    require_keys_neq!(old_custody, new_custody, TidError::SameCustodyAddress);
 
     record.custody_address = new_custody;
 
     let lookup = &mut ctx.accounts.new_custody_lookup;
-    lookup.fid = record.fid;
+    lookup.tid = record.tid;
     lookup.bump = ctx.bumps.new_custody_lookup;
 
-    emit!(FidTransferred {
-        fid: record.fid,
+    emit!(TidTransferred {
+        tid: record.tid,
         old_custody,
         new_custody,
     });

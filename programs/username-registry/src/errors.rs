@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum UsernameError {
-    #[msg("Unauthorized: signer is not the FID custody address")]
+    #[msg("Unauthorized: signer is not the TID custody address")]
     UnauthorizedCustody,
     #[msg("Username too long (max 20 characters)")]
     UsernameTooLong,

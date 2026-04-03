@@ -13,7 +13,7 @@ declare_id!("65oKjSjcGYR61ASzDYczbodz6H8TARtJyQGvb5V9y9W1");
 pub mod username_registry {
     use super::*;
 
-    /// Register a username for an FID.
+    /// Register a username for a TID.
     pub fn register_username(ctx: Context<RegisterUsername>, username: String) -> Result<()> {
         instructions::register::handler(ctx, username)
     }
@@ -23,9 +23,9 @@ pub mod username_registry {
         instructions::renew::handler(ctx)
     }
 
-    /// Transfer a username to a different FID.
-    pub fn transfer_username(ctx: Context<TransferUsername>, new_fid: u64) -> Result<()> {
-        instructions::transfer::handler(ctx, new_fid)
+    /// Transfer a username to a different TID.
+    pub fn transfer_username(ctx: Context<TransferUsername>, new_tid: u64) -> Result<()> {
+        instructions::transfer::handler(ctx, new_tid)
     }
 
     /// Release a username (close account, reclaim rent).

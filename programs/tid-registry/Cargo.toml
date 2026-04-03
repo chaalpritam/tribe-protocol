@@ -1,12 +1,12 @@
 [package]
-name = "fid-registry"
+name = "tid-registry"
 version = "0.1.0"
-description = "Tribe Protocol — FID Registry Program"
+description = "Tribe Protocol — TID Registry Program"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "fid_registry"
+name = "tid_registry"
 
 [features]
 default = []

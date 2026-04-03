@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { expect } from "chai";
-import { FidRegistry } from "../target/types/fid_registry";
+import { TidRegistry } from "../target/types/tid_registry";
 import { AppKeyRegistry } from "../target/types/app_key_registry";
 import { UsernameRegistry } from "../target/types/username_registry";
 import { SocialGraph } from "../target/types/social_graph";
@@ -11,7 +11,7 @@ describe("tribe-protocol", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const fidRegistry = anchor.workspace.FidRegistry as Program<FidRegistry>;
+  const tidRegistry = anchor.workspace.TidRegistry as Program<TidRegistry>;
   const appKeyRegistry = anchor.workspace.AppKeyRegistry as Program<AppKeyRegistry>;
   const usernameRegistry = anchor.workspace.UsernameRegistry as Program<UsernameRegistry>;
   const socialGraph = anchor.workspace.SocialGraph as Program<SocialGraph>;
@@ -21,36 +21,36 @@ describe("tribe-protocol", () => {
   const newCustodyKeypair = Keypair.generate();
 
   // Helpers
-  function fidToBuffer(fid: number): Buffer {
+  function tidToBuffer(tid: number): Buffer {
     const buf = Buffer.alloc(8);
-    buf.writeBigUInt64LE(BigInt(fid));
+    buf.writeBigUInt64LE(BigInt(tid));
     return buf;
   }
 
   function deriveGlobalState(): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [Buffer.from("global_state")],
-      fidRegistry.programId
+      tidRegistry.programId
     );
   }
 
-  function deriveFidRecord(fid: number): [PublicKey, number] {
+  function deriveTidRecord(tid: number): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
-      [Buffer.from("fid"), fidToBuffer(fid)],
-      fidRegistry.programId
+      [Buffer.from("tid"), tidToBuffer(tid)],
+      tidRegistry.programId
     );
   }
 
   function deriveCustodyLookup(custodyPubkey: PublicKey): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [Buffer.from("custody"), custodyPubkey.toBuffer()],
-      fidRegistry.programId
+      tidRegistry.programId
     );
   }
 
-  function deriveAppKeyRecord(fid: number, appPubkey: PublicKey): [PublicKey, number] {
+  function deriveAppKeyRecord(tid: number, appPubkey: PublicKey): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
-      [Buffer.from("app_key"), fidToBuffer(fid), appPubkey.toBuffer()],
+      [Buffer.from("app_key"), tidToBuffer(tid), appPubkey.toBuffer()],
       appKeyRegistry.programId
     );
   }
@@ -62,34 +62,34 @@ describe("tribe-protocol", () => {
     );
   }
 
-  function deriveFidUsername(fid: number): [PublicKey, number] {
+  function deriveTidUsername(tid: number): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
-      [Buffer.from("fid_username"), fidToBuffer(fid)],
+      [Buffer.from("tid_username"), tidToBuffer(tid)],
       usernameRegistry.programId
     );
   }
 
-  function deriveSocialProfile(fid: number): [PublicKey, number] {
+  function deriveSocialProfile(tid: number): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
-      [Buffer.from("social_profile"), fidToBuffer(fid)],
+      [Buffer.from("social_profile"), tidToBuffer(tid)],
       socialGraph.programId
     );
   }
 
-  function deriveLink(followerFid: number, followingFid: number): [PublicKey, number] {
+  function deriveLink(followerTid: number, followingTid: number): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
-      [Buffer.from("link"), fidToBuffer(followerFid), fidToBuffer(followingFid)],
+      [Buffer.from("link"), tidToBuffer(followerTid), tidToBuffer(followingTid)],
       socialGraph.programId
     );
   }
 
-  // ========== FID Registry ==========
+  // ========== TID Registry ==========
 
-  describe("FID Registry", () => {
+  describe("TID Registry", () => {
     it("initializes global state", async () => {
       const [globalState] = deriveGlobalState();
 
-      await fidRegistry.methods
+      await tidRegistry.methods
         .initialize()
         .accountsStrict({
           globalState,
@@ -98,75 +98,75 @@ describe("tribe-protocol", () => {
         })
         .rpc();
 
-      const state = await fidRegistry.account.globalState.fetch(globalState);
-      expect(state.fidCounter.toNumber()).to.equal(0);
+      const state = await tidRegistry.account.globalState.fetch(globalState);
+      expect(state.tidCounter.toNumber()).to.equal(0);
       expect(state.authority.toBase58()).to.equal(custody.publicKey.toBase58());
     });
 
-    it("registers a new FID (fid=1)", async () => {
+    it("registers a new TID (tid=1)", async () => {
       const [globalState] = deriveGlobalState();
-      const [fidRecord] = deriveFidRecord(1);
+      const [tidRecord] = deriveTidRecord(1);
       const [custodyLookup] = deriveCustodyLookup(custody.publicKey);
 
-      await fidRegistry.methods
+      await tidRegistry.methods
         .register(recoveryKeypair.publicKey)
         .accountsStrict({
           globalState,
-          fidRecord,
+          tidRecord,
           custodyLookup,
           custody: custody.publicKey,
           systemProgram: SystemProgram.programId,
         })
         .rpc();
 
-      const record = await fidRegistry.account.fidRecord.fetch(fidRecord);
-      expect(record.fid.toNumber()).to.equal(1);
+      const record = await tidRegistry.account.tidRecord.fetch(tidRecord);
+      expect(record.tid.toNumber()).to.equal(1);
       expect(record.custodyAddress.toBase58()).to.equal(custody.publicKey.toBase58());
       expect(record.recoveryAddress.toBase58()).to.equal(recoveryKeypair.publicKey.toBase58());
 
-      const state = await fidRegistry.account.globalState.fetch(globalState);
-      expect(state.fidCounter.toNumber()).to.equal(1);
+      const state = await tidRegistry.account.globalState.fetch(globalState);
+      expect(state.tidCounter.toNumber()).to.equal(1);
     });
 
-    it("looks up FID by custody address", async () => {
+    it("looks up TID by custody address", async () => {
       const [custodyLookup] = deriveCustodyLookup(custody.publicKey);
-      const lookup = await fidRegistry.account.custodyLookup.fetch(custodyLookup);
-      expect(lookup.fid.toNumber()).to.equal(1);
+      const lookup = await tidRegistry.account.custodyLookup.fetch(custodyLookup);
+      expect(lookup.tid.toNumber()).to.equal(1);
     });
 
     it("changes recovery address", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+      const [tidRecord] = deriveTidRecord(1);
       const newRecovery = Keypair.generate();
 
-      await fidRegistry.methods
+      await tidRegistry.methods
         .changeRecovery(newRecovery.publicKey)
         .accountsStrict({
-          fidRecord,
+          tidRecord,
           custody: custody.publicKey,
         })
         .rpc();
 
-      const record = await fidRegistry.account.fidRecord.fetch(fidRecord);
+      const record = await tidRegistry.account.tidRecord.fetch(tidRecord);
       expect(record.recoveryAddress.toBase58()).to.equal(newRecovery.publicKey.toBase58());
 
       // Change back for later tests
-      await fidRegistry.methods
+      await tidRegistry.methods
         .changeRecovery(recoveryKeypair.publicKey)
         .accountsStrict({
-          fidRecord,
+          tidRecord,
           custody: custody.publicKey,
         })
         .rpc();
     });
 
     it("rejects change recovery to same address", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+      const [tidRecord] = deriveTidRecord(1);
 
       try {
-        await fidRegistry.methods
+        await tidRegistry.methods
           .changeRecovery(recoveryKeypair.publicKey)
           .accountsStrict({
-            fidRecord,
+            tidRecord,
             custody: custody.publicKey,
           })
           .rpc();
@@ -176,15 +176,15 @@ describe("tribe-protocol", () => {
       }
     });
 
-    it("transfers FID custody", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+    it("transfers TID custody", async () => {
+      const [tidRecord] = deriveTidRecord(1);
       const [oldCustodyLookup] = deriveCustodyLookup(custody.publicKey);
       const [newCustodyLookup] = deriveCustodyLookup(newCustodyKeypair.publicKey);
 
-      await fidRegistry.methods
+      await tidRegistry.methods
         .transfer(newCustodyKeypair.publicKey)
         .accountsStrict({
-          fidRecord,
+          tidRecord,
           oldCustodyLookup,
           newCustodyLookup,
           newCustody: newCustodyKeypair.publicKey,
@@ -193,7 +193,7 @@ describe("tribe-protocol", () => {
         })
         .rpc();
 
-      const record = await fidRegistry.account.fidRecord.fetch(fidRecord);
+      const record = await tidRegistry.account.tidRecord.fetch(tidRecord);
       expect(record.custodyAddress.toBase58()).to.equal(newCustodyKeypair.publicKey.toBase58());
 
       // Old lookup should be closed
@@ -201,8 +201,8 @@ describe("tribe-protocol", () => {
       expect(oldLookup).to.be.null;
     });
 
-    it("recovers FID using recovery address", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+    it("recovers TID using recovery address", async () => {
+      const [tidRecord] = deriveTidRecord(1);
       const [oldCustodyLookup] = deriveCustodyLookup(newCustodyKeypair.publicKey);
       const [newCustodyLookup] = deriveCustodyLookup(custody.publicKey);
 
@@ -213,10 +213,10 @@ describe("tribe-protocol", () => {
       );
       await provider.connection.confirmTransaction(sig);
 
-      await fidRegistry.methods
+      await tidRegistry.methods
         .recover(custody.publicKey)
         .accountsStrict({
-          fidRecord,
+          tidRecord,
           oldCustodyLookup,
           newCustodyLookup,
           newCustody: custody.publicKey,
@@ -226,12 +226,12 @@ describe("tribe-protocol", () => {
         .signers([recoveryKeypair])
         .rpc();
 
-      const record = await fidRegistry.account.fidRecord.fetch(fidRecord);
+      const record = await tidRegistry.account.tidRecord.fetch(tidRecord);
       expect(record.custodyAddress.toBase58()).to.equal(custody.publicKey.toBase58());
     });
 
     it("rejects unauthorized transfer", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+      const [tidRecord] = deriveTidRecord(1);
       const faker = Keypair.generate();
 
       const fakeSig = await provider.connection.requestAirdrop(
@@ -244,10 +244,10 @@ describe("tribe-protocol", () => {
       const [newCustodyLookup] = deriveCustodyLookup(Keypair.generate().publicKey);
 
       try {
-        await fidRegistry.methods
+        await tidRegistry.methods
           .transfer(Keypair.generate().publicKey)
           .accountsStrict({
-            fidRecord,
+            tidRecord,
             oldCustodyLookup,
             newCustodyLookup,
             newCustody: Keypair.generate().publicKey,
@@ -273,13 +273,13 @@ describe("tribe-protocol", () => {
     const appKey3 = Keypair.generate();
 
     it("adds an app key with Full scope", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+      const [tidRecord] = deriveTidRecord(1);
       const [appKeyRecord] = deriveAppKeyRecord(1, appKey1.publicKey);
 
       await appKeyRegistry.methods
         .addAppKey(appKey1.publicKey, 0, new anchor.BN(0))
         .accountsStrict({
-          fidRecord,
+          tidRecord,
           appKeyRecord,
           custody: custody.publicKey,
           systemProgram: SystemProgram.programId,
@@ -287,21 +287,21 @@ describe("tribe-protocol", () => {
         .rpc();
 
       const record = await appKeyRegistry.account.appKeyRecord.fetch(appKeyRecord);
-      expect(record.fid.toNumber()).to.equal(1);
+      expect(record.tid.toNumber()).to.equal(1);
       expect(record.appPubkey.toBase58()).to.equal(appKey1.publicKey.toBase58());
       expect(record.scope).to.equal(0);
       expect(record.revoked).to.be.false;
     });
 
-    it("adds an app key with CastsOnly scope and expiry", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+    it("adds an app key with TweetsOnly scope and expiry", async () => {
+      const [tidRecord] = deriveTidRecord(1);
       const [appKeyRecord] = deriveAppKeyRecord(1, appKey2.publicKey);
       const expiry = Math.floor(Date.now() / 1000) + 86400; // 24h from now
 
       await appKeyRegistry.methods
         .addAppKey(appKey2.publicKey, 1, new anchor.BN(expiry))
         .accountsStrict({
-          fidRecord,
+          tidRecord,
           appKeyRecord,
           custody: custody.publicKey,
           systemProgram: SystemProgram.programId,
@@ -314,13 +314,13 @@ describe("tribe-protocol", () => {
     });
 
     it("revokes an app key", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+      const [tidRecord] = deriveTidRecord(1);
       const [appKeyRecord] = deriveAppKeyRecord(1, appKey2.publicKey);
 
       await appKeyRegistry.methods
         .revokeAppKey()
         .accountsStrict({
-          fidRecord,
+          tidRecord,
           appKeyRecord,
           custody: custody.publicKey,
         })
@@ -331,14 +331,14 @@ describe("tribe-protocol", () => {
     });
 
     it("rejects revoking already-revoked key", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+      const [tidRecord] = deriveTidRecord(1);
       const [appKeyRecord] = deriveAppKeyRecord(1, appKey2.publicKey);
 
       try {
         await appKeyRegistry.methods
           .revokeAppKey()
           .accountsStrict({
-            fidRecord,
+            tidRecord,
             appKeyRecord,
             custody: custody.publicKey,
           })
@@ -350,14 +350,14 @@ describe("tribe-protocol", () => {
     });
 
     it("rotates an app key", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+      const [tidRecord] = deriveTidRecord(1);
       const [oldAppKeyRecord] = deriveAppKeyRecord(1, appKey1.publicKey);
       const [newAppKeyRecord] = deriveAppKeyRecord(1, appKey3.publicKey);
 
       await appKeyRegistry.methods
         .rotateAppKey(appKey3.publicKey, 2, new anchor.BN(0))
         .accountsStrict({
-          fidRecord,
+          tidRecord,
           oldAppKeyRecord,
           newAppKeyRecord,
           custody: custody.publicKey,
@@ -379,23 +379,23 @@ describe("tribe-protocol", () => {
 
   describe("Username Registry", () => {
     it("registers a username", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+      const [tidRecord] = deriveTidRecord(1);
       const [usernameRecord] = deriveUsernameRecord("alice");
-      const [fidUsername] = deriveFidUsername(1);
+      const [tidUsername] = deriveTidUsername(1);
 
       await usernameRegistry.methods
         .registerUsername("alice")
         .accountsStrict({
-          fidRecord,
+          tidRecord,
           usernameRecord,
-          fidUsername,
+          tidUsername,
           custody: custody.publicKey,
           systemProgram: SystemProgram.programId,
         })
         .rpc();
 
       const record = await usernameRegistry.account.usernameRecord.fetch(usernameRecord);
-      expect(record.fid.toNumber()).to.equal(1);
+      expect(record.tid.toNumber()).to.equal(1);
       // Decode fixed-size username
       const usernameBytes = record.username as number[];
       const name = Buffer.from(usernameBytes.slice(0, record.usernameLen)).toString("utf-8");
@@ -404,17 +404,17 @@ describe("tribe-protocol", () => {
     });
 
     it("rejects invalid characters", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+      const [tidRecord] = deriveTidRecord(1);
       const [usernameRecord] = deriveUsernameRecord("alice@bob");
-      const [fidUsername] = deriveFidUsername(1);
+      const [tidUsername] = deriveTidUsername(1);
 
       try {
         await usernameRegistry.methods
           .registerUsername("alice@bob")
           .accountsStrict({
-            fidRecord,
+            tidRecord,
             usernameRecord,
-            fidUsername,
+            tidUsername,
             custody: custody.publicKey,
             systemProgram: SystemProgram.programId,
           })
@@ -428,7 +428,7 @@ describe("tribe-protocol", () => {
     });
 
     it("renews a username", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+      const [tidRecord] = deriveTidRecord(1);
       const [usernameRecord] = deriveUsernameRecord("alice");
 
       const before = await usernameRegistry.account.usernameRecord.fetch(usernameRecord);
@@ -437,7 +437,7 @@ describe("tribe-protocol", () => {
       await usernameRegistry.methods
         .renewUsername()
         .accountsStrict({
-          fidRecord,
+          tidRecord,
           usernameRecord,
           custody: custody.publicKey,
         })
@@ -448,16 +448,16 @@ describe("tribe-protocol", () => {
     });
 
     it("releases a username", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+      const [tidRecord] = deriveTidRecord(1);
       const [usernameRecord] = deriveUsernameRecord("alice");
-      const [fidUsername] = deriveFidUsername(1);
+      const [tidUsername] = deriveTidUsername(1);
 
       await usernameRegistry.methods
         .releaseUsername()
         .accountsStrict({
-          fidRecord,
+          tidRecord,
           usernameRecord,
-          fidUsername,
+          tidUsername,
           custody: custody.publicKey,
         })
         .rpc();
@@ -466,15 +466,15 @@ describe("tribe-protocol", () => {
       const usernameInfo = await provider.connection.getAccountInfo(usernameRecord);
       expect(usernameInfo).to.be.null;
 
-      const fidUsernameInfo = await provider.connection.getAccountInfo(fidUsername);
-      expect(fidUsernameInfo).to.be.null;
+      const tidUsernameInfo = await provider.connection.getAccountInfo(tidUsername);
+      expect(tidUsernameInfo).to.be.null;
     });
   });
 
   // ========== Social Graph ==========
 
   describe("Social Graph", () => {
-    // Register a second FID for follow/unfollow tests
+    // Register a second TID for follow/unfollow tests
     const user2Keypair = Keypair.generate();
 
     before(async () => {
@@ -485,16 +485,16 @@ describe("tribe-protocol", () => {
       );
       await provider.connection.confirmTransaction(sig);
 
-      // Register FID 2 for user2
+      // Register TID 2 for user2
       const [globalState] = deriveGlobalState();
-      const [fidRecord2] = deriveFidRecord(2);
+      const [tidRecord2] = deriveTidRecord(2);
       const [custodyLookup2] = deriveCustodyLookup(user2Keypair.publicKey);
 
-      await fidRegistry.methods
+      await tidRegistry.methods
         .register(Keypair.generate().publicKey)
         .accountsStrict({
           globalState,
-          fidRecord: fidRecord2,
+          tidRecord: tidRecord2,
           custodyLookup: custodyLookup2,
           custody: user2Keypair.publicKey,
           systemProgram: SystemProgram.programId,
@@ -503,14 +503,14 @@ describe("tribe-protocol", () => {
         .rpc();
     });
 
-    it("initializes social profile for FID 1", async () => {
-      const [fidRecord] = deriveFidRecord(1);
+    it("initializes social profile for TID 1", async () => {
+      const [tidRecord] = deriveTidRecord(1);
       const [socialProfile] = deriveSocialProfile(1);
 
       await socialGraph.methods
         .initProfile()
         .accountsStrict({
-          fidRecord,
+          tidRecord,
           socialProfile,
           custody: custody.publicKey,
           systemProgram: SystemProgram.programId,
@@ -518,19 +518,19 @@ describe("tribe-protocol", () => {
         .rpc();
 
       const profile = await socialGraph.account.socialProfile.fetch(socialProfile);
-      expect(profile.fid.toNumber()).to.equal(1);
+      expect(profile.tid.toNumber()).to.equal(1);
       expect(profile.followingCount).to.equal(0);
       expect(profile.followersCount).to.equal(0);
     });
 
-    it("initializes social profile for FID 2", async () => {
-      const [fidRecord2] = deriveFidRecord(2);
+    it("initializes social profile for TID 2", async () => {
+      const [tidRecord2] = deriveTidRecord(2);
       const [socialProfile2] = deriveSocialProfile(2);
 
       await socialGraph.methods
         .initProfile()
         .accountsStrict({
-          fidRecord: fidRecord2,
+          tidRecord: tidRecord2,
           socialProfile: socialProfile2,
           custody: user2Keypair.publicKey,
           systemProgram: SystemProgram.programId,
@@ -539,11 +539,11 @@ describe("tribe-protocol", () => {
         .rpc();
 
       const profile = await socialGraph.account.socialProfile.fetch(socialProfile2);
-      expect(profile.fid.toNumber()).to.equal(2);
+      expect(profile.tid.toNumber()).to.equal(2);
     });
 
-    it("follows a user (FID 1 → FID 2)", async () => {
-      const [followerFidRecord] = deriveFidRecord(1);
+    it("follows a user (TID 1 → TID 2)", async () => {
+      const [followerTidRecord] = deriveTidRecord(1);
       const [followerProfile] = deriveSocialProfile(1);
       const [followingProfile] = deriveSocialProfile(2);
       const [link] = deriveLink(1, 2);
@@ -551,7 +551,7 @@ describe("tribe-protocol", () => {
       await socialGraph.methods
         .follow()
         .accountsStrict({
-          followerFidRecord,
+          followerTidRecord,
           followerProfile,
           followingProfile,
           link,
@@ -562,8 +562,8 @@ describe("tribe-protocol", () => {
 
       // Verify link exists
       const linkAccount = await socialGraph.account.link.fetch(link);
-      expect(linkAccount.followerFid.toNumber()).to.equal(1);
-      expect(linkAccount.followingFid.toNumber()).to.equal(2);
+      expect(linkAccount.followerTid.toNumber()).to.equal(1);
+      expect(linkAccount.followingTid.toNumber()).to.equal(2);
 
       // Verify counters
       const fProfile = await socialGraph.account.socialProfile.fetch(followerProfile);
@@ -574,7 +574,7 @@ describe("tribe-protocol", () => {
     });
 
     it("rejects duplicate follow", async () => {
-      const [followerFidRecord] = deriveFidRecord(1);
+      const [followerTidRecord] = deriveTidRecord(1);
       const [followerProfile] = deriveSocialProfile(1);
       const [followingProfile] = deriveSocialProfile(2);
       const [link] = deriveLink(1, 2);
@@ -583,7 +583,7 @@ describe("tribe-protocol", () => {
         await socialGraph.methods
           .follow()
           .accountsStrict({
-            followerFidRecord,
+            followerTidRecord,
             followerProfile,
             followingProfile,
             link,
@@ -599,7 +599,7 @@ describe("tribe-protocol", () => {
     });
 
     it("rejects self-follow", async () => {
-      const [followerFidRecord] = deriveFidRecord(1);
+      const [followerTidRecord] = deriveTidRecord(1);
       const [followerProfile] = deriveSocialProfile(1);
       const [link] = deriveLink(1, 1);
 
@@ -607,7 +607,7 @@ describe("tribe-protocol", () => {
         await socialGraph.methods
           .follow()
           .accountsStrict({
-            followerFidRecord,
+            followerTidRecord,
             followerProfile,
             followingProfile: followerProfile, // same profile
             link,
@@ -621,8 +621,8 @@ describe("tribe-protocol", () => {
       }
     });
 
-    it("unfollows a user (FID 1 → FID 2)", async () => {
-      const [followerFidRecord] = deriveFidRecord(1);
+    it("unfollows a user (TID 1 → TID 2)", async () => {
+      const [followerTidRecord] = deriveTidRecord(1);
       const [followerProfile] = deriveSocialProfile(1);
       const [followingProfile] = deriveSocialProfile(2);
       const [link] = deriveLink(1, 2);
@@ -630,7 +630,7 @@ describe("tribe-protocol", () => {
       await socialGraph.methods
         .unfollow()
         .accountsStrict({
-          followerFidRecord,
+          followerTidRecord,
           followerProfile,
           followingProfile,
           link,

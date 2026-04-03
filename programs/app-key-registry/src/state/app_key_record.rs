@@ -3,11 +3,11 @@ use anchor_lang::prelude::*;
 /// Scoped delegation key — apps sign on behalf of users.
 #[account]
 pub struct AppKeyRecord {
-    /// The FID this key belongs to.
-    pub fid: u64,
+    /// The TID this key belongs to.
+    pub tid: u64,
     /// The ephemeral pubkey the app uses to sign messages.
     pub app_pubkey: Pubkey,
-    /// Permission scope: 0=Full, 1=CastsOnly, 2=SocialOnly, 3=ReadOnly.
+    /// Permission scope: 0=Full, 1=TweetsOnly, 2=SocialOnly, 3=ReadOnly.
     pub scope: u8,
     /// When this key was created.
     pub created_at: i64,
@@ -29,7 +29,7 @@ impl AppKeyRecord {
 /// Scope constants.
 pub mod scope {
     pub const FULL: u8 = 0;
-    pub const CASTS_ONLY: u8 = 1;
+    pub const TWEETS_ONLY: u8 = 1;
     pub const SOCIAL_ONLY: u8 = 2;
     pub const READ_ONLY: u8 = 3;
 }

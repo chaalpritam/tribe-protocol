@@ -8,8 +8,8 @@ use anchor_lang::prelude::*;
 /// - Unfollow reclaims rent (~0.001 SOL back to follower)
 #[account]
 pub struct Link {
-    pub follower_fid: u64,
-    pub following_fid: u64,
+    pub follower_tid: u64,
+    pub following_tid: u64,
     pub created_at: i64,
     pub bump: u8,
 }

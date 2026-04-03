@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum AppKeyError {
-    #[msg("Unauthorized: signer is not the FID custody address")]
+    #[msg("Unauthorized: signer is not the TID custody address")]
     UnauthorizedCustody,
     #[msg("Invalid scope value (must be 0-3)")]
     InvalidScope,

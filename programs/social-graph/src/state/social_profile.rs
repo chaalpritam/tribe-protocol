@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 
-/// Social profile — stores only counters. One per FID.
+/// Social profile — stores only counters. One per TID.
 #[account]
 pub struct SocialProfile {
-    pub fid: u64,
+    pub tid: u64,
     pub following_count: u32,
     pub followers_count: u32,
     pub bump: u8,

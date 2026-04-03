@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use crate::state::{GlobalState, FidRecord, CustodyLookup};
-use crate::events::FidRegistered;
+use crate::state::{GlobalState, TidRecord, CustodyLookup};
+use crate::events::TidRegistered;
 
 #[derive(Accounts)]
 pub struct Register<'info> {
@@ -14,11 +14,11 @@ pub struct Register<'info> {
     #[account(
         init,
         payer = custody,
-        space = FidRecord::SIZE,
-        seeds = [b"fid", (global_state.fid_counter + 1).to_le_bytes().as_ref()],
+        space = TidRecord::SIZE,
+        seeds = [b"tid", (global_state.tid_counter + 1).to_le_bytes().as_ref()],
         bump,
     )]
-    pub fid_record: Account<'info, FidRecord>,
+    pub tid_record: Account<'info, TidRecord>,
 
     #[account(
         init,
@@ -37,21 +37,21 @@ pub struct Register<'info> {
 
 pub fn handler(ctx: Context<Register>, recovery_address: Pubkey) -> Result<()> {
     let state = &mut ctx.accounts.global_state;
-    let fid = state.next_fid();
+    let tid = state.next_tid();
 
-    let record = &mut ctx.accounts.fid_record;
-    record.fid = fid;
+    let record = &mut ctx.accounts.tid_record;
+    record.tid = tid;
     record.custody_address = ctx.accounts.custody.key();
     record.recovery_address = recovery_address;
     record.registered_at = Clock::get()?.unix_timestamp;
-    record.bump = ctx.bumps.fid_record;
+    record.bump = ctx.bumps.tid_record;
 
     let lookup = &mut ctx.accounts.custody_lookup;
-    lookup.fid = fid;
+    lookup.tid = tid;
     lookup.bump = ctx.bumps.custody_lookup;
 
-    emit!(FidRegistered {
-        fid,
+    emit!(TidRegistered {
+        tid,
         custody_address: ctx.accounts.custody.key(),
         recovery_address,
     });

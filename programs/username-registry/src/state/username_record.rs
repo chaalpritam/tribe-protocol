@@ -4,15 +4,15 @@ pub const MAX_USERNAME_LEN: usize = 20;
 /// One year in seconds.
 pub const REGISTRATION_DURATION: i64 = 365 * 24 * 60 * 60;
 
-/// Username record — human-readable name bound to an FID.
+/// Username record — human-readable name bound to a TID.
 #[account]
 pub struct UsernameRecord {
     /// Fixed-size username (padded with zeros). Avoids realloc.
     pub username: [u8; MAX_USERNAME_LEN],
     /// Actual length of the username string.
     pub username_len: u8,
-    /// The FID this username is bound to.
-    pub fid: u64,
+    /// The TID this username is bound to.
+    pub tid: u64,
     /// Unix timestamp of registration.
     pub registered_at: i64,
     /// Expiry timestamp (annual renewal).
@@ -32,13 +32,13 @@ impl UsernameRecord {
     }
 }
 
-/// Reverse lookup: FID → username hash.
+/// Reverse lookup: TID → username hash.
 #[account]
-pub struct FidUsername {
+pub struct TidUsername {
     pub username_hash: [u8; 32],
     pub bump: u8,
 }
 
-impl FidUsername {
+impl TidUsername {
     pub const SIZE: usize = 8 + 32 + 1; // = 41
 }

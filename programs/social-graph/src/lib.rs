@@ -13,7 +13,7 @@ declare_id!("8kKnWvbmTjWq5uPePk79RRbQMAXCszNFzHdRwUS4N74w");
 pub mod social_graph {
     use super::*;
 
-    /// Initialize a social profile for an FID (once per user).
+    /// Initialize a social profile for a TID (once per user).
     pub fn init_profile(ctx: Context<InitProfile>) -> Result<()> {
         instructions::init_profile::handler(ctx)
     }

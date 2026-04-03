@@ -2,17 +2,17 @@ use anchor_lang::prelude::*;
 
 #[event]
 pub struct ProfileInitialized {
-    pub fid: u64,
+    pub tid: u64,
 }
 
 #[event]
 pub struct Followed {
-    pub follower_fid: u64,
-    pub following_fid: u64,
+    pub follower_tid: u64,
+    pub following_tid: u64,
 }
 
 #[event]
 pub struct Unfollowed {
-    pub follower_fid: u64,
-    pub following_fid: u64,
+    pub follower_tid: u64,
+    pub following_tid: u64,
 }

@@ -13,7 +13,7 @@ declare_id!("5LtbFUeAoXWRovGpyWnRJhiCS62XsTYKVErT9kPpv4hN");
 pub mod app_key_registry {
     use super::*;
 
-    /// Add a new app key for an FID.
+    /// Add a new app key for a TID.
     pub fn add_app_key(
         ctx: Context<AddAppKey>,
         app_pubkey: Pubkey,

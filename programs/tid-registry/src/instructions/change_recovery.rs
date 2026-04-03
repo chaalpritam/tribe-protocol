@@ -1,31 +1,31 @@
 use anchor_lang::prelude::*;
-use crate::state::FidRecord;
-use crate::errors::FidError;
+use crate::state::TidRecord;
+use crate::errors::TidError;
 use crate::events::RecoveryChanged;
 
 #[derive(Accounts)]
 pub struct ChangeRecovery<'info> {
     #[account(
         mut,
-        seeds = [b"fid", fid_record.fid.to_le_bytes().as_ref()],
-        bump = fid_record.bump,
-        constraint = fid_record.custody_address == custody.key() @ FidError::UnauthorizedCustody,
+        seeds = [b"tid", tid_record.tid.to_le_bytes().as_ref()],
+        bump = tid_record.bump,
+        constraint = tid_record.custody_address == custody.key() @ TidError::UnauthorizedCustody,
     )]
-    pub fid_record: Account<'info, FidRecord>,
+    pub tid_record: Account<'info, TidRecord>,
 
     pub custody: Signer<'info>,
 }
 
 pub fn handler(ctx: Context<ChangeRecovery>, new_recovery: Pubkey) -> Result<()> {
-    let record = &mut ctx.accounts.fid_record;
+    let record = &mut ctx.accounts.tid_record;
     let old_recovery = record.recovery_address;
 
-    require_keys_neq!(old_recovery, new_recovery, FidError::SameRecoveryAddress);
+    require_keys_neq!(old_recovery, new_recovery, TidError::SameRecoveryAddress);
 
     record.recovery_address = new_recovery;
 
     emit!(RecoveryChanged {
-        fid: record.fid,
+        tid: record.tid,
         old_recovery,
         new_recovery,
     });
