@@ -33,6 +33,11 @@ pub mod social_graph {
         instructions::init_sequencer::handler(ctx, authority)
     }
 
+    /// Initialize a social profile via sequencer authority — used by ER server.
+    pub fn init_profile_delegated(ctx: Context<InitProfileDelegated>, tid: u64) -> Result<()> {
+        instructions::init_profile_delegated::handler(ctx, tid)
+    }
+
     /// Follow via sequencer authority — used by ER server for batched settlement.
     pub fn follow_delegated(ctx: Context<FollowDelegated>, follower_tid: u64, following_tid: u64) -> Result<()> {
         instructions::follow_delegated::handler(ctx, follower_tid, following_tid)
