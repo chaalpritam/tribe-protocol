@@ -8,4 +8,6 @@ pub enum SocialGraphError {
     CannotFollowSelf,
     #[msg("Profile already initialized")]
     ProfileAlreadyExists,
+    #[msg("Unauthorized: signer is not the registered sequencer")]
+    UnauthorizedSequencer,
 }

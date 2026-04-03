@@ -27,4 +27,19 @@ pub mod social_graph {
     pub fn unfollow(ctx: Context<Unfollow>) -> Result<()> {
         instructions::unfollow::handler(ctx)
     }
+
+    /// Initialize the sequencer config (one-time setup by admin).
+    pub fn init_sequencer(ctx: Context<InitSequencer>, authority: Pubkey) -> Result<()> {
+        instructions::init_sequencer::handler(ctx, authority)
+    }
+
+    /// Follow via sequencer authority — used by ER server for batched settlement.
+    pub fn follow_delegated(ctx: Context<FollowDelegated>, follower_tid: u64, following_tid: u64) -> Result<()> {
+        instructions::follow_delegated::handler(ctx, follower_tid, following_tid)
+    }
+
+    /// Unfollow via sequencer authority — used by ER server for batched settlement.
+    pub fn unfollow_delegated(ctx: Context<UnfollowDelegated>, follower_tid: u64, following_tid: u64) -> Result<()> {
+        instructions::unfollow_delegated::handler(ctx, follower_tid, following_tid)
+    }
 }
