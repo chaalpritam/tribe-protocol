@@ -157,9 +157,10 @@ tribe-protocol/
 
 | Repo | Description |
 |------|-------------|
-| [tribe-sdk](../tribe-sdk) | TypeScript SDK, network config, protobuf definitions |
+| [tribe-sdk](../tribe-sdk) | TypeScript SDK -- identity, social graph, tweet clients |
 | [tribe-hub](../tribe-hub) | Decentralized hub -- tweet storage, indexing, gossip sync |
-| [tribe-er-server](../tribe-er-server) | Ephemeral Rollup sequencer for instant social graph operations |
+| [tribe-er-server](../tribe-er-server) | Ephemeral Rollup sequencer -- instant follows, batched L1 settlement |
+| [tribe-app](../tribe-app) | Next.js frontend -- 10 pages with multi-node failover |
 
 ## License
 
