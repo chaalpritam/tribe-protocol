@@ -158,8 +158,8 @@ tribe-protocol/
 | Repo | Description |
 |------|-------------|
 | [tribe-sdk](../tribe-sdk) | TypeScript SDK, network config, protobuf definitions |
-| [tribe-tweet-server](../tribe-tweet-server) | Off-chain tweet server -- message storage and validation |
-| [tribe-indexer](../tribe-indexer) | Event indexer and read API |
+| [tribe-hub](../tribe-hub) | Decentralized hub -- tweet storage, indexing, gossip sync |
+| [tribe-er-server](../tribe-er-server) | Ephemeral Rollup sequencer for instant social graph operations |
 
 ## License
 
