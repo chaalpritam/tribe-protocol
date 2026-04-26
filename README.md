@@ -2,7 +2,7 @@
 
 Solana programs (Anchor) for decentralized social identity and graph.
 
-Tribe is a fully-owned, open social protocol on Solana. This repo contains seven on-chain programs covering identity, app keys, usernames, the social graph (with ER delegation), hub discovery, on-chain tip receipts, and crowdfund campaigns with escrow.
+Tribe is a fully-owned, open social protocol on Solana. This repo contains eight on-chain programs covering identity, app keys, usernames, the social graph (with ER delegation), hub discovery, on-chain tip receipts, crowdfund campaigns with escrow, and local tasks with optional reward escrow.
 
 ## Programs
 
@@ -15,6 +15,7 @@ Tribe is a fully-owned, open social protocol on Solana. This repo contains seven
 | **hub-registry** | `HubReg1111111111111111111111111111111111111` | `register_hub`, `update_hub`, `heartbeat`, `deactivate_hub` |
 | **tip-registry** | `TipReg1111111111111111111111111111111111111` | `init_sender_state`, `send_tip` |
 | **crowdfund-registry** | `CrowdF11111111111111111111111111111111111111` | `init_creator_state`, `create_crowdfund`, `pledge`, `claim_funds`, `refund` |
+| **task-registry** | `TaskReg111111111111111111111111111111111111` | `init_creator_state`, `create_task`, `claim_task`, `complete_task`, `cancel_task` |
 
 ## Architecture
 
@@ -91,6 +92,18 @@ On-chain crowdfunding campaigns with escrow. Each creator has a `CreatorCrowdfun
 - **claim_funds()** -- creator only. After the deadline, if `total_pledged >= goal_amount`, sweeps the campaign vault into the creator's wallet and flips status to `Succeeded`.
 - **refund()** -- backer only. After the deadline, if the goal wasn't met, returns the backer's pledge from the vault and closes the `Pledge` PDA (rent goes back to the backer). First refund flips status `Active` → `Failed`; subsequent refunds are idempotent.
 
+### Task Registry
+
+Local tasks with an optional reward escrow. Each creator has a `CreatorTaskState` (PDA seeded by their wallet) tracking `next_task_id`; each task is a `Task` PDA at `["task", creator_pubkey, task_id_le]` that doubles as the reward vault when `reward_amount > 0`.
+
+State machine: `Open` → `Claimed` → `Completed` (or `Open` → `Cancelled`). Once a task has been claimed, the creator can't cancel it; the only path forward is `complete_task` (which releases the escrow to the claimer).
+
+- **init_creator_state(creator_tid)** -- one-time per creator.
+- **create_task(reward_amount, metadata_hash)** -- creates an open task; if `reward_amount > 0`, escrows that many lamports into the Task PDA. `metadata_hash` anchors the off-chain `TASK_ADD` envelope (title / description / reward_text).
+- **claim_task(claimer_tid)** -- claimer signs to lock the task to themselves. Creator can't claim their own task.
+- **complete_task()** -- creator-only. Releases the escrowed reward (if any) to the claimer and flips status to `Completed`.
+- **cancel_task()** -- creator-only. Refunds any escrow back to the creator. Only valid while the task is still `Open`.
+
 ## Account Structures
 
 ### tid-registry
@@ -142,6 +155,13 @@ On-chain crowdfunding campaigns with escrow. Each creator has a `CreatorCrowdfun
 | `CreatorCrowdfundState` | 57 bytes | `creator: Pubkey`, `creator_tid: u64`, `next_crowdfund_id: u64`, `bump: u8` |
 | `Crowdfund` | 126 bytes | `creator: Pubkey`, `creator_tid: u64`, `crowdfund_id: u64`, `goal_amount: u64`, `total_pledged: u64`, `pledge_count: u32`, `deadline_at: i64`, `created_at: i64`, `status: u8`, `bump: u8`, `metadata_hash: [u8; 32]` |
 | `Pledge` | 97 bytes | `crowdfund: Pubkey`, `backer: Pubkey`, `backer_tid: u64`, `amount: u64`, `pledged_at: i64`, `bump: u8` |
+
+### task-registry
+
+| Account | Size | Fields |
+|---------|------|--------|
+| `CreatorTaskState` | 57 bytes | `creator: Pubkey`, `creator_tid: u64`, `next_task_id: u64`, `bump: u8` |
+| `Task` | 171 bytes | `creator: Pubkey`, `creator_tid: u64`, `task_id: u64`, `status: u8`, `reward_amount: u64`, `claimer: Pubkey`, `claimer_tid: u64`, `has_claimer: bool`, `created_at: i64`, `claimed_at: i64`, `completed_at: i64`, `metadata_hash: [u8; 32]`, `bump: u8` |
 
 Note: all sizes include the 8-byte Anchor discriminator.
 
@@ -223,12 +243,20 @@ tribe-protocol/
 │   │       ├── instructions/     # init_sender_state, send_tip
 │   │       ├── errors.rs
 │   │       └── events.rs
-│   └── crowdfund-registry/
+│   ├── crowdfund-registry/
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── state/            # CreatorCrowdfundState, Crowdfund, Pledge
+│   │       ├── instructions/     # init_creator_state, create_crowdfund,
+│   │       │                     # pledge, claim_funds, refund
+│   │       ├── errors.rs
+│   │       └── events.rs
+│   └── task-registry/
 │       └── src/
 │           ├── lib.rs
-│           ├── state/            # CreatorCrowdfundState, Crowdfund, Pledge
-│           ├── instructions/     # init_creator_state, create_crowdfund,
-│           │                     # pledge, claim_funds, refund
+│           ├── state/            # CreatorTaskState, Task
+│           ├── instructions/     # init_creator_state, create_task,
+│           │                     # claim_task, complete_task, cancel_task
 │           ├── errors.rs
 │           └── events.rs
 ├── tests/                        # Anchor integration tests (TypeScript)
