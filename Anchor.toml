@@ -15,6 +15,7 @@ crowdfund_registry = "CrowdF11111111111111111111111111111111111111"
 task_registry = "TaskReg111111111111111111111111111111111111"
 channel_registry = "ChanReg111111111111111111111111111111111111"
 karma_registry = "KarmaReg11111111111111111111111111111111111"
+poll_registry = "HPd8FqxVfoeBxwBr7wuKDeahgGX1V9UewxEWzjZY2SAm"
 
 [programs.devnet]
 tid_registry = "4BSmJmRGQWKgioP9DG2bUuRS9U3V6soRauU7Nv6yGvHD"
@@ -27,6 +28,7 @@ crowdfund_registry = "CrowdF11111111111111111111111111111111111111"
 task_registry = "TaskReg111111111111111111111111111111111111"
 channel_registry = "ChanReg111111111111111111111111111111111111"
 karma_registry = "KarmaReg11111111111111111111111111111111111"
+poll_registry = "HPd8FqxVfoeBxwBr7wuKDeahgGX1V9UewxEWzjZY2SAm"
 
 [registry]
 url = "https://api.apr.dev"
