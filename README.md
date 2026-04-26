@@ -2,7 +2,7 @@
 
 Solana programs (Anchor) for decentralized social identity and graph.
 
-Tribe is a fully-owned, open social protocol on Solana. This repo contains the four on-chain programs that form the foundation layer: identity registration, app key delegation, human-readable usernames, and a social graph.
+Tribe is a fully-owned, open social protocol on Solana. This repo contains the five on-chain programs that form the foundation layer: identity registration, app key delegation, human-readable usernames, a social graph (with Ephemeral Rollup delegation), and a hub registry for peer discovery.
 
 ## Programs
 
@@ -11,7 +11,8 @@ Tribe is a fully-owned, open social protocol on Solana. This repo contains the f
 | **tid-registry** | `4BSmJmRGQWKgioP9DG2bUuRS9U3V6soRauU7Nv6yGvHD` | `initialize`, `register`, `transfer`, `recover`, `change_recovery` |
 | **app-key-registry** | `5LtbFUeAoXWRovGpyWnRJhiCS62XsTYKVErT9kPpv4hN` | `add_key`, `revoke_key`, `rotate_key` |
 | **username-registry** | `65oKjSjcGYR61ASzDYczbodz6H8TARtJyQGvb5V9y9W1` | `register`, `renew`, `transfer`, `release` |
-| **social-graph** | `8kKnWvbmTjWq5uPePk79RRbQMAXCszNFzHdRwUS4N74w` | `init_profile`, `follow`, `unfollow` |
+| **social-graph** | `8kKnWvbmTjWq5uPePk79RRbQMAXCszNFzHdRwUS4N74w` | `init_profile`, `follow`, `unfollow`, `init_sequencer`, `init_profile_delegated`, `follow_delegated`, `unfollow_delegated` |
+| **hub-registry** | `HubReg1111111111111111111111111111111111111` | `register_hub`, `update_hub`, `heartbeat`, `deactivate_hub` |
 
 ## Architecture
 
@@ -37,6 +38,15 @@ Instead of storing followers in a `Vec<u64>` (which would hit Solana's 10 MB acc
   - Unlimited follows per user
   - Unfollow reclaims rent (~0.001 SOL returned to follower)
 
+#### ER Delegation (instant follows)
+
+The base instructions (`init_profile`, `follow`, `unfollow`) cost SOL and require user signatures. To make follows instant and free at the UX layer, the program also exposes a delegated path used by [tribe-er-server](../tribe-er-server):
+
+- **`init_sequencer`** -- one-time setup; admin authorizes a single ER server pubkey via the `SequencerConfig` PDA.
+- **`init_profile_delegated` / `follow_delegated` / `unfollow_delegated`** -- same effect as the base instructions, but signed by the ER server on behalf of the user. The server collects signed user intents off-chain and settles them on L1 in batches.
+
+The non-delegated path remains available — any wallet can still call `follow` directly without the sequencer.
+
 ### App Keys (Scoped Delegation)
 
 Apps can request a delegation key that lets them sign messages on behalf of a user without holding the user's main wallet key. Each `AppKeyRecord` stores:
@@ -52,6 +62,15 @@ Users can revoke keys at any time. Keys can also be rotated to a new pubkey.
 ### Usernames (.tribe)
 
 Human-readable names (up to 20 characters) bound to TIDs. Each `UsernameRecord` stores the name, the bound TID, registration time, and an expiry timestamp. Usernames require annual renewal. A `TidUsername` reverse lookup maps each TID to the hash of its current username.
+
+### Hub Registry
+
+A discovery layer for the gossip network. Anyone can run a hub; the registry lets clients find healthy peers without a central directory:
+
+- **register_hub** -- operator publishes a `HubRecord` (URL + gossip pubkey) anchored to their wallet.
+- **update_hub** -- rotate the URL or gossip key.
+- **heartbeat** -- refresh `last_heartbeat` to prove liveness; clients filter on this when choosing peers.
+- **deactivate_hub** -- mark a hub inactive (e.g., before retiring it).
 
 ## Account Structures
 
@@ -82,6 +101,13 @@ Human-readable names (up to 20 characters) bound to TIDs. Each `UsernameRecord` 
 |---------|------|--------|
 | `SocialProfile` | 25 bytes | `tid: u64`, `following_count: u32`, `followers_count: u32`, `bump: u8` |
 | `Link` | 33 bytes | `follower_tid: u64`, `following_tid: u64`, `created_at: i64`, `bump: u8` |
+| `SequencerConfig` | 73 bytes | `authority: Pubkey`, `admin: Pubkey`, `bump: u8` |
+
+### hub-registry
+
+| Account | Size | Fields |
+|---------|------|--------|
+| `HubRecord` | 219 bytes | `operator: Pubkey`, `url: [u8; 128]`, `url_len: u8`, `gossip_key: Pubkey`, `registered_at: i64`, `last_heartbeat: i64`, `active: bool`, `bump: u8` |
 
 Note: all sizes include the 8-byte Anchor discriminator.
 
@@ -99,10 +125,10 @@ Note: all sizes include the 8-byte Anchor discriminator.
 # Install JS dependencies
 pnpm install
 
-# Build all four programs
+# Build all five programs
 anchor build
 
-# Run the full test suite (23 tests, uses a local validator)
+# Run the full test suite (uses a local validator)
 anchor test
 
 # Deploy to devnet
@@ -140,11 +166,20 @@ tribe-protocol/
 │   │       ├── instructions/     # register, renew, transfer, release
 │   │       ├── errors.rs
 │   │       └── events.rs
-│   └── social-graph/
+│   ├── social-graph/
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── state/            # SocialProfile, Link, SequencerConfig
+│   │       ├── instructions/     # init_profile, follow, unfollow,
+│   │       │                     # init_sequencer, init_profile_delegated,
+│   │       │                     # follow_delegated, unfollow_delegated
+│   │       ├── errors.rs
+│   │       └── events.rs
+│   └── hub-registry/
 │       └── src/
 │           ├── lib.rs
-│           ├── state/            # SocialProfile, Link
-│           ├── instructions/     # init_profile, follow, unfollow
+│           ├── state/            # HubRecord
+│           ├── instructions/     # register_hub, update_hub, heartbeat, deactivate_hub
 │           ├── errors.rs
 │           └── events.rs
 ├── tests/                        # Anchor integration tests (TypeScript)
