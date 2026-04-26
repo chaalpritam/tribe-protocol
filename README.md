@@ -2,7 +2,7 @@
 
 Solana programs (Anchor) for decentralized social identity and graph.
 
-Tribe is a fully-owned, open social protocol on Solana. This repo contains nine on-chain programs covering identity, app keys, usernames, the social graph (with ER delegation), hub discovery, on-chain tip receipts, crowdfund campaigns with escrow, local tasks with optional reward escrow, and globally-owned channel records.
+Tribe is a fully-owned, open social protocol on Solana. This repo contains ten on-chain programs covering identity, app keys, usernames, the social graph (with ER delegation), hub discovery, on-chain tip receipts, crowdfund campaigns with escrow, local tasks with optional reward escrow, globally-owned channel records, and trustless karma aggregation.
 
 ## Programs
 
@@ -17,6 +17,7 @@ Tribe is a fully-owned, open social protocol on Solana. This repo contains nine 
 | **crowdfund-registry** | `CrowdF11111111111111111111111111111111111111` | `init_creator_state`, `create_crowdfund`, `pledge`, `claim_funds`, `refund` |
 | **task-registry** | `TaskReg111111111111111111111111111111111111` | `init_creator_state`, `create_task`, `claim_task`, `complete_task`, `cancel_task` |
 | **channel-registry** | `ChanReg111111111111111111111111111111111111` | `register_channel`, `update_channel`, `transfer_channel` |
+| **karma-registry** | `KarmaReg11111111111111111111111111111111111` | `init_karma_account`, `record_tip_received`, `record_task_completed` |
 
 ## Architecture
 
@@ -115,6 +116,18 @@ The reserved id `general` is hub-seeded as the protocol's default channel and ca
 - **update_channel(id, latitude, longitude, has_location, metadata_hash)** -- owner-only. Update location and / or off-chain metadata. Kind cannot change.
 - **transfer_channel(id, new_owner_tid)** -- owner-only. Hand the channel to a new TID + wallet. V1 simple transfer (no two-step accept).
 
+### Karma Registry
+
+Aggregates reputation from on-chain receipts so karma is portable, public, and trustless. The `KarmaAccount` for a TID is a small set of counters (`tips_received_count`, `tips_received_lamports`, `tasks_completed_count`, `tasks_completed_reward_lamports`); anyone can fund it into existence.
+
+To prevent double-counting, every increment requires a `KarmaProof` PDA seeded by the source record's pubkey. The `init` constraint on the proof guarantees each `TipRecord` or `Task` can only be credited once — re-running the same instruction twice fails because the proof PDA already exists.
+
+V1 sources are `tip-registry::TipRecord` and `task-registry::Task` (Completed status). Tweets, follows, and reactions live off-chain in the hub today; future iterations can either expose those programs to the karma registry the same way or let the hub publish signed roll-up summaries.
+
+- **init_karma_account(tid)** -- one-time per TID. Anyone can pay the rent.
+- **record_tip_received(tip_record)** -- credit a tip. Verifies `tip.recipient_tid == karma.tid`.
+- **record_task_completed(task)** -- credit a completed task. Verifies `task.status == Completed` and `task.claimer_tid == karma.tid`.
+
 ## Account Structures
 
 ### tid-registry
@@ -179,6 +192,13 @@ The reserved id `general` is hub-seeded as the protocol's default channel and ca
 | Account | Size | Fields |
 |---------|------|--------|
 | `ChannelRecord` | 148 bytes | `id: [u8; 32]`, `id_len: u8`, `kind: u8`, `owner: Pubkey`, `owner_tid: u64`, `metadata_hash: [u8; 32]`, `latitude: f64`, `longitude: f64`, `has_location: bool`, `created_at: i64`, `updated_at: i64`, `bump: u8` |
+
+### karma-registry
+
+| Account | Size | Fields |
+|---------|------|--------|
+| `KarmaAccount` | 49 bytes | `tid: u64`, `tips_received_count: u64`, `tips_received_lamports: u64`, `tasks_completed_count: u64`, `tasks_completed_reward_lamports: u64`, `bump: u8` |
+| `KarmaProof` | 50 bytes | `source: Pubkey`, `kind: u8`, `tid: u64`, `bump: u8` |
 
 Note: all sizes include the 8-byte Anchor discriminator.
 
@@ -276,11 +296,19 @@ tribe-protocol/
 │   │       │                     # claim_task, complete_task, cancel_task
 │   │       ├── errors.rs
 │   │       └── events.rs
-│   └── channel-registry/
+│   ├── channel-registry/
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── state/            # ChannelRecord
+│   │       ├── instructions/     # register_channel, update_channel, transfer_channel
+│   │       ├── errors.rs
+│   │       └── events.rs
+│   └── karma-registry/
 │       └── src/
 │           ├── lib.rs
-│           ├── state/            # ChannelRecord
-│           ├── instructions/     # register_channel, update_channel, transfer_channel
+│           ├── state/            # KarmaAccount, KarmaProof
+│           ├── instructions/     # init_karma_account,
+│           │                     # record_tip_received, record_task_completed
 │           ├── errors.rs
 │           └── events.rs
 ├── tests/                        # Anchor integration tests (TypeScript)

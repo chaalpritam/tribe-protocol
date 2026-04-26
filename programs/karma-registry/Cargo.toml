@@ -1,0 +1,25 @@
+[package]
+name = "karma-registry"
+version = "0.1.0"
+description = "On-chain karma aggregation for the Tribe protocol"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "karma_registry"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = "0.31.1"
+# We deserialize TipRecord and Task accounts to verify their contents
+# before crediting karma. The `cpi` feature gives us the typed Borsh
+# accounts without registering a duplicate program entrypoint.
+tip-registry = { path = "../tip-registry", features = ["cpi"] }
+task-registry = { path = "../task-registry", features = ["cpi"] }
