@@ -2,7 +2,7 @@
 
 Solana programs (Anchor) for decentralized social identity and graph.
 
-Tribe is a fully-owned, open social protocol on Solana. This repo contains eight on-chain programs covering identity, app keys, usernames, the social graph (with ER delegation), hub discovery, on-chain tip receipts, crowdfund campaigns with escrow, and local tasks with optional reward escrow.
+Tribe is a fully-owned, open social protocol on Solana. This repo contains nine on-chain programs covering identity, app keys, usernames, the social graph (with ER delegation), hub discovery, on-chain tip receipts, crowdfund campaigns with escrow, local tasks with optional reward escrow, and globally-owned channel records.
 
 ## Programs
 
@@ -16,6 +16,7 @@ Tribe is a fully-owned, open social protocol on Solana. This repo contains eight
 | **tip-registry** | `TipReg1111111111111111111111111111111111111` | `init_sender_state`, `send_tip` |
 | **crowdfund-registry** | `CrowdF11111111111111111111111111111111111111` | `init_creator_state`, `create_crowdfund`, `pledge`, `claim_funds`, `refund` |
 | **task-registry** | `TaskReg111111111111111111111111111111111111` | `init_creator_state`, `create_task`, `claim_task`, `complete_task`, `cancel_task` |
+| **channel-registry** | `ChanReg111111111111111111111111111111111111` | `register_channel`, `update_channel`, `transfer_channel` |
 
 ## Architecture
 
@@ -104,6 +105,16 @@ State machine: `Open` → `Claimed` → `Completed` (or `Open` → `Cancelled`).
 - **complete_task()** -- creator-only. Releases the escrowed reward (if any) to the claimer and flips status to `Completed`.
 - **cancel_task()** -- creator-only. Refunds any escrow back to the creator. Only valid while the task is still `Open`.
 
+### Channel Registry
+
+A single source of truth for who owns a channel id. Channels live in hub databases too (where the actual tweets are indexed), but anyone can also write to a hub — without an on-chain anchor there's nothing stopping a hostile hub from squatting `san-francisco`. This program fixes that: each id maps to exactly one `ChannelRecord` PDA, derived directly from the id bytes, so the first registration globally wins.
+
+The reserved id `general` is hub-seeded as the protocol's default channel and cannot be registered here. Only `CITY` (kind = 2) and `INTEREST` (kind = 3) are user-creatable; `GENERAL` (kind = 1) is rejected. On-chain ids are capped at 32 bytes — long enough for slugs like `san-francisco`, `solana-devs`, or `interest-rust-lang`.
+
+- **register_channel(id, kind, owner_tid, latitude, longitude, has_location, metadata_hash)** -- claim ownership of a channel id. Validates the slug against `/^[a-z0-9-]+$/`, rejects `general`, and records the off-chain `CHANNEL_ADD` envelope hash so apps can fetch title / description / image without a second round trip.
+- **update_channel(id, latitude, longitude, has_location, metadata_hash)** -- owner-only. Update location and / or off-chain metadata. Kind cannot change.
+- **transfer_channel(id, new_owner_tid)** -- owner-only. Hand the channel to a new TID + wallet. V1 simple transfer (no two-step accept).
+
 ## Account Structures
 
 ### tid-registry
@@ -162,6 +173,12 @@ State machine: `Open` → `Claimed` → `Completed` (or `Open` → `Cancelled`).
 |---------|------|--------|
 | `CreatorTaskState` | 57 bytes | `creator: Pubkey`, `creator_tid: u64`, `next_task_id: u64`, `bump: u8` |
 | `Task` | 171 bytes | `creator: Pubkey`, `creator_tid: u64`, `task_id: u64`, `status: u8`, `reward_amount: u64`, `claimer: Pubkey`, `claimer_tid: u64`, `has_claimer: bool`, `created_at: i64`, `claimed_at: i64`, `completed_at: i64`, `metadata_hash: [u8; 32]`, `bump: u8` |
+
+### channel-registry
+
+| Account | Size | Fields |
+|---------|------|--------|
+| `ChannelRecord` | 148 bytes | `id: [u8; 32]`, `id_len: u8`, `kind: u8`, `owner: Pubkey`, `owner_tid: u64`, `metadata_hash: [u8; 32]`, `latitude: f64`, `longitude: f64`, `has_location: bool`, `created_at: i64`, `updated_at: i64`, `bump: u8` |
 
 Note: all sizes include the 8-byte Anchor discriminator.
 
@@ -251,12 +268,19 @@ tribe-protocol/
 │   │       │                     # pledge, claim_funds, refund
 │   │       ├── errors.rs
 │   │       └── events.rs
-│   └── task-registry/
+│   ├── task-registry/
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── state/            # CreatorTaskState, Task
+│   │       ├── instructions/     # init_creator_state, create_task,
+│   │       │                     # claim_task, complete_task, cancel_task
+│   │       ├── errors.rs
+│   │       └── events.rs
+│   └── channel-registry/
 │       └── src/
 │           ├── lib.rs
-│           ├── state/            # CreatorTaskState, Task
-│           ├── instructions/     # init_creator_state, create_task,
-│           │                     # claim_task, complete_task, cancel_task
+│           ├── state/            # ChannelRecord
+│           ├── instructions/     # register_channel, update_channel, transfer_channel
 │           ├── errors.rs
 │           └── events.rs
 ├── tests/                        # Anchor integration tests (TypeScript)
