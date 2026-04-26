@@ -2,7 +2,7 @@
 
 Solana programs (Anchor) for decentralized social identity and graph.
 
-Tribe is a fully-owned, open social protocol on Solana. This repo contains eleven on-chain programs covering identity, app keys, usernames, the social graph (with ER delegation), hub discovery, on-chain tip receipts, crowdfund campaigns with escrow, local tasks with optional reward escrow, globally-owned channel records, trustless karma aggregation, and one-vote-per-TID polls.
+Tribe is a fully-owned, open social protocol on Solana. This repo contains twelve on-chain programs covering identity, app keys, usernames, the social graph (with ER delegation), hub discovery, on-chain tip receipts, crowdfund campaigns with escrow, local tasks with optional reward escrow, globally-owned channel records, trustless karma aggregation, one-vote-per-TID polls, and events with one-RSVP-per-TID.
 
 ## Programs
 
@@ -19,6 +19,7 @@ Tribe is a fully-owned, open social protocol on Solana. This repo contains eleve
 | **channel-registry** | `ChanReg111111111111111111111111111111111111` | `register_channel`, `update_channel`, `transfer_channel` |
 | **karma-registry** | `KarmaReg11111111111111111111111111111111111` | `init_karma_account`, `record_tip_received`, `record_task_completed` |
 | **poll-registry** | `HPd8FqxVfoeBxwBr7wuKDeahgGX1V9UewxEWzjZY2SAm` | `init_creator_state`, `create_poll`, `vote` |
+| **event-registry** | `D2Gt2qkNAa8gZAmvqt3PWH39ydBL1cpwuXqeogkCoPRk` | `init_creator_state`, `create_event`, `rsvp`, `update_rsvp` |
 
 ## Architecture
 
@@ -139,6 +140,15 @@ Polls support 2 to 8 options (capped to keep the tally fixed-size and avoid Vec 
 - **create_poll(option_count, expires_at, has_expiry, metadata_hash)** -- creates a poll with all-zero tallies and the off-chain envelope hash.
 - **vote(voter_tid, option_index)** -- casts a vote. Increments `poll.option_votes[option_index]` and `poll.total_votes`; creates a `Vote` PDA so the same voter can't vote again.
 
+### Event Registry
+
+Events with one-RSVP-per-TID. Title / description / location_text live in the off-chain `EVENT_ADD` envelope; this program stores the timing window, optional canonical `latitude` / `longitude`, and per-status RSVP counters (`yes_count` / `no_count` / `maybe_count`). The `Rsvp` PDA seeded by `(event, attendee)` has an `init` constraint that prevents double-RSVPs; `update_rsvp` flips the response without spawning a second account.
+
+- **init_creator_state(creator_tid)** -- one-time per creator.
+- **create_event(starts_at, ends_at, has_end, latitude, longitude, has_location, metadata_hash)** -- starts an event with all-zero counters. Rejects past start times and end-before-start.
+- **rsvp(attendee_tid, status)** -- 1 = Yes, 2 = No, 3 = Maybe. Bumps the matching counter; creates the `Rsvp` PDA so the same wallet can't RSVP twice.
+- **update_rsvp(status)** -- attendee-only. Decrements the previous status counter and increments the new one. Rejects no-op updates.
+
 ## Account Structures
 
 ### tid-registry
@@ -218,6 +228,14 @@ Polls support 2 to 8 options (capped to keep the tally fixed-size and avoid Vec 
 | `CreatorPollState` | 57 bytes | `creator: Pubkey`, `creator_tid: u64`, `next_poll_id: u64`, `bump: u8` |
 | `Poll` | 134 bytes | `creator: Pubkey`, `creator_tid: u64`, `poll_id: u64`, `option_count: u8`, `option_votes: [u32; 8]`, `total_votes: u32`, `expires_at: i64`, `has_expiry: bool`, `created_at: i64`, `metadata_hash: [u8; 32]`, `bump: u8` |
 | `Vote` | 90 bytes | `poll: Pubkey`, `voter: Pubkey`, `voter_tid: u64`, `option_index: u8`, `voted_at: i64`, `bump: u8` |
+
+### event-registry
+
+| Account | Size | Fields |
+|---------|------|--------|
+| `CreatorEventState` | 57 bytes | `creator: Pubkey`, `creator_tid: u64`, `next_event_id: u64`, `bump: u8` |
+| `Event` | 143 bytes | `creator: Pubkey`, `creator_tid: u64`, `event_id: u64`, `starts_at: i64`, `ends_at: i64`, `has_end: bool`, `latitude: f64`, `longitude: f64`, `has_location: bool`, `yes_count: u32`, `no_count: u32`, `maybe_count: u32`, `created_at: i64`, `metadata_hash: [u8; 32]`, `bump: u8` |
+| `Rsvp` | 90 bytes | `event: Pubkey`, `attendee: Pubkey`, `attendee_tid: u64`, `status: u8`, `responded_at: i64`, `bump: u8` |
 
 Note: all sizes include the 8-byte Anchor discriminator.
 
@@ -330,11 +348,19 @@ tribe-protocol/
 │   │       │                     # record_tip_received, record_task_completed
 │   │       ├── errors.rs
 │   │       └── events.rs
-│   └── poll-registry/
+│   ├── poll-registry/
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── state/            # CreatorPollState, Poll, Vote
+│   │       ├── instructions/     # init_creator_state, create_poll, vote
+│   │       ├── errors.rs
+│   │       └── events.rs
+│   └── event-registry/
 │       └── src/
 │           ├── lib.rs
-│           ├── state/            # CreatorPollState, Poll, Vote
-│           ├── instructions/     # init_creator_state, create_poll, vote
+│           ├── state/            # CreatorEventState, Event, Rsvp
+│           ├── instructions/     # init_creator_state, create_event,
+│           │                     # rsvp, update_rsvp
 │           ├── errors.rs
 │           └── events.rs
 ├── tests/                        # Anchor integration tests (TypeScript)
