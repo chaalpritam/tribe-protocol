@@ -1,0 +1,23 @@
+[package]
+name = "crowdfund-registry"
+version = "0.1.0"
+description = "On-chain crowdfund campaigns + escrow for the Tribe protocol"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "crowdfund_registry"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+# init-if-needed lets backers re-pledge into the same Pledge PDA. Safe
+# here because the seeds are program-derived and the handler treats
+# `pledge.amount == 0` as the "first time" sentinel.
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }

@@ -2,7 +2,7 @@
 
 Solana programs (Anchor) for decentralized social identity and graph.
 
-Tribe is a fully-owned, open social protocol on Solana. This repo contains six on-chain programs: identity registration, app key delegation, human-readable usernames, a social graph (with Ephemeral Rollup delegation), a hub registry for peer discovery, and a tip registry that records on-chain tip receipts.
+Tribe is a fully-owned, open social protocol on Solana. This repo contains seven on-chain programs covering identity, app keys, usernames, the social graph (with ER delegation), hub discovery, on-chain tip receipts, and crowdfund campaigns with escrow.
 
 ## Programs
 
@@ -14,6 +14,7 @@ Tribe is a fully-owned, open social protocol on Solana. This repo contains six o
 | **social-graph** | `8kKnWvbmTjWq5uPePk79RRbQMAXCszNFzHdRwUS4N74w` | `init_profile`, `follow`, `unfollow`, `init_sequencer`, `init_profile_delegated`, `follow_delegated`, `unfollow_delegated` |
 | **hub-registry** | `HubReg1111111111111111111111111111111111111` | `register_hub`, `update_hub`, `heartbeat`, `deactivate_hub` |
 | **tip-registry** | `TipReg1111111111111111111111111111111111111` | `init_sender_state`, `send_tip` |
+| **crowdfund-registry** | `CrowdF11111111111111111111111111111111111111` | `init_creator_state`, `create_crowdfund`, `pledge`, `claim_funds`, `refund` |
 
 ## Architecture
 
@@ -80,6 +81,16 @@ On-chain tip receipts plus the SOL transfer in a single instruction. Each sender
 - **init_sender_state(sender_tid)** -- one-time per sender. Creates the counter PDA so subsequent tips have deterministic addresses.
 - **send_tip(recipient_tid, amount, target_hash, has_target)** -- transfers `amount` lamports from the signer to `recipient` via System Program CPI, then writes the immutable `TipRecord`. Rejects zero amounts and self-tips. `target_hash` optionally anchors the tip to a piece of content (e.g. the blake3 hash of a tweet).
 
+### Crowdfund Registry
+
+On-chain crowdfunding campaigns with escrow. Each creator has a `CreatorCrowdfundState` (PDA seeded by their wallet) tracking `next_crowdfund_id`; each campaign is a `Crowdfund` PDA at `["crowdfund", creator_pubkey, crowdfund_id_le]` that doubles as the lamport vault. Per-backer pledges are tracked in `Pledge` PDAs seeded by `["pledge", crowdfund_pubkey, backer_pubkey]`.
+
+- **init_creator_state(creator_tid)** -- one-time per creator.
+- **create_crowdfund(goal_amount, deadline_at, metadata_hash)** -- starts a campaign. `metadata_hash` anchors the off-chain `CROWDFUND_ADD` envelope (title / description / image / currency).
+- **pledge(backer_tid, amount)** -- transfers lamports into the Crowdfund PDA, updates the backer's `Pledge` (creating it on first pledge, accumulating on repeat). Rejected after the deadline or on a non-active campaign.
+- **claim_funds()** -- creator only. After the deadline, if `total_pledged >= goal_amount`, sweeps the campaign vault into the creator's wallet and flips status to `Succeeded`.
+- **refund()** -- backer only. After the deadline, if the goal wasn't met, returns the backer's pledge from the vault and closes the `Pledge` PDA (rent goes back to the backer). First refund flips status `Active` → `Failed`; subsequent refunds are idempotent.
+
 ## Account Structures
 
 ### tid-registry
@@ -123,6 +134,14 @@ On-chain tip receipts plus the SOL transfer in a single instruction. Each sender
 |---------|------|--------|
 | `SenderTipState` | 57 bytes | `sender: Pubkey`, `sender_tid: u64`, `next_tip_id: u64`, `bump: u8` |
 | `TipRecord` | 146 bytes | `sender: Pubkey`, `recipient: Pubkey`, `sender_tid: u64`, `recipient_tid: u64`, `amount: u64`, `tip_id: u64`, `created_at: i64`, `target_hash: [u8; 32]`, `has_target: bool`, `bump: u8` |
+
+### crowdfund-registry
+
+| Account | Size | Fields |
+|---------|------|--------|
+| `CreatorCrowdfundState` | 57 bytes | `creator: Pubkey`, `creator_tid: u64`, `next_crowdfund_id: u64`, `bump: u8` |
+| `Crowdfund` | 126 bytes | `creator: Pubkey`, `creator_tid: u64`, `crowdfund_id: u64`, `goal_amount: u64`, `total_pledged: u64`, `pledge_count: u32`, `deadline_at: i64`, `created_at: i64`, `status: u8`, `bump: u8`, `metadata_hash: [u8; 32]` |
+| `Pledge` | 97 bytes | `crowdfund: Pubkey`, `backer: Pubkey`, `backer_tid: u64`, `amount: u64`, `pledged_at: i64`, `bump: u8` |
 
 Note: all sizes include the 8-byte Anchor discriminator.
 
@@ -197,11 +216,19 @@ tribe-protocol/
 │   │       ├── instructions/     # register_hub, update_hub, heartbeat, deactivate_hub
 │   │       ├── errors.rs
 │   │       └── events.rs
-│   └── tip-registry/
+│   ├── tip-registry/
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── state/            # SenderTipState, TipRecord
+│   │       ├── instructions/     # init_sender_state, send_tip
+│   │       ├── errors.rs
+│   │       └── events.rs
+│   └── crowdfund-registry/
 │       └── src/
 │           ├── lib.rs
-│           ├── state/            # SenderTipState, TipRecord
-│           ├── instructions/     # init_sender_state, send_tip
+│           ├── state/            # CreatorCrowdfundState, Crowdfund, Pledge
+│           ├── instructions/     # init_creator_state, create_crowdfund,
+│           │                     # pledge, claim_funds, refund
 │           ├── errors.rs
 │           └── events.rs
 ├── tests/                        # Anchor integration tests (TypeScript)
