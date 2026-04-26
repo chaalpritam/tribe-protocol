@@ -2,7 +2,7 @@
 
 Solana programs (Anchor) for decentralized social identity and graph.
 
-Tribe is a fully-owned, open social protocol on Solana. This repo contains the five on-chain programs that form the foundation layer: identity registration, app key delegation, human-readable usernames, a social graph (with Ephemeral Rollup delegation), and a hub registry for peer discovery.
+Tribe is a fully-owned, open social protocol on Solana. This repo contains six on-chain programs: identity registration, app key delegation, human-readable usernames, a social graph (with Ephemeral Rollup delegation), a hub registry for peer discovery, and a tip registry that records on-chain tip receipts.
 
 ## Programs
 
@@ -13,6 +13,7 @@ Tribe is a fully-owned, open social protocol on Solana. This repo contains the f
 | **username-registry** | `65oKjSjcGYR61ASzDYczbodz6H8TARtJyQGvb5V9y9W1` | `register`, `renew`, `transfer`, `release` |
 | **social-graph** | `8kKnWvbmTjWq5uPePk79RRbQMAXCszNFzHdRwUS4N74w` | `init_profile`, `follow`, `unfollow`, `init_sequencer`, `init_profile_delegated`, `follow_delegated`, `unfollow_delegated` |
 | **hub-registry** | `HubReg1111111111111111111111111111111111111` | `register_hub`, `update_hub`, `heartbeat`, `deactivate_hub` |
+| **tip-registry** | `TipReg1111111111111111111111111111111111111` | `init_sender_state`, `send_tip` |
 
 ## Architecture
 
@@ -72,6 +73,13 @@ A discovery layer for the gossip network. Anyone can run a hub; the registry let
 - **heartbeat** -- refresh `last_heartbeat` to prove liveness; clients filter on this when choosing peers.
 - **deactivate_hub** -- mark a hub inactive (e.g., before retiring it).
 
+### Tip Registry
+
+On-chain tip receipts plus the SOL transfer in a single instruction. Each sender has a `SenderTipState` (PDA seeded by their wallet) holding a monotonic `next_tip_id`; every tip becomes a `TipRecord` PDA seeded by `["tip", sender_pubkey, tip_id_le]`.
+
+- **init_sender_state(sender_tid)** -- one-time per sender. Creates the counter PDA so subsequent tips have deterministic addresses.
+- **send_tip(recipient_tid, amount, target_hash, has_target)** -- transfers `amount` lamports from the signer to `recipient` via System Program CPI, then writes the immutable `TipRecord`. Rejects zero amounts and self-tips. `target_hash` optionally anchors the tip to a piece of content (e.g. the blake3 hash of a tweet).
+
 ## Account Structures
 
 ### tid-registry
@@ -108,6 +116,13 @@ A discovery layer for the gossip network. Anyone can run a hub; the registry let
 | Account | Size | Fields |
 |---------|------|--------|
 | `HubRecord` | 219 bytes | `operator: Pubkey`, `url: [u8; 128]`, `url_len: u8`, `gossip_key: Pubkey`, `registered_at: i64`, `last_heartbeat: i64`, `active: bool`, `bump: u8` |
+
+### tip-registry
+
+| Account | Size | Fields |
+|---------|------|--------|
+| `SenderTipState` | 57 bytes | `sender: Pubkey`, `sender_tid: u64`, `next_tip_id: u64`, `bump: u8` |
+| `TipRecord` | 146 bytes | `sender: Pubkey`, `recipient: Pubkey`, `sender_tid: u64`, `recipient_tid: u64`, `amount: u64`, `tip_id: u64`, `created_at: i64`, `target_hash: [u8; 32]`, `has_target: bool`, `bump: u8` |
 
 Note: all sizes include the 8-byte Anchor discriminator.
 
@@ -175,11 +190,18 @@ tribe-protocol/
 │   │       │                     # follow_delegated, unfollow_delegated
 │   │       ├── errors.rs
 │   │       └── events.rs
-│   └── hub-registry/
+│   ├── hub-registry/
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── state/            # HubRecord
+│   │       ├── instructions/     # register_hub, update_hub, heartbeat, deactivate_hub
+│   │       ├── errors.rs
+│   │       └── events.rs
+│   └── tip-registry/
 │       └── src/
 │           ├── lib.rs
-│           ├── state/            # HubRecord
-│           ├── instructions/     # register_hub, update_hub, heartbeat, deactivate_hub
+│           ├── state/            # SenderTipState, TipRecord
+│           ├── instructions/     # init_sender_state, send_tip
 │           ├── errors.rs
 │           └── events.rs
 ├── tests/                        # Anchor integration tests (TypeScript)
