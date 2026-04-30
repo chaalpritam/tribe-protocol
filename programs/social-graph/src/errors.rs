@@ -10,4 +10,6 @@ pub enum SocialGraphError {
     ProfileAlreadyExists,
     #[msg("Unauthorized: signer is not the registered sequencer")]
     UnauthorizedSequencer,
+    #[msg("Unauthorized: signer is not the sequencer config admin")]
+    UnauthorizedAdmin,
 }

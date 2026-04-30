@@ -33,6 +33,12 @@ pub mod social_graph {
         instructions::init_sequencer::handler(ctx, authority)
     }
 
+    /// Rotate the sequencer authority — admin-gated, lets the ER wallet
+    /// be replaced if it's lost or compromised without redeploying.
+    pub fn update_sequencer(ctx: Context<UpdateSequencer>, new_authority: Pubkey) -> Result<()> {
+        instructions::update_sequencer::handler(ctx, new_authority)
+    }
+
     /// Initialize a social profile via sequencer authority — used by ER server.
     pub fn init_profile_delegated(ctx: Context<InitProfileDelegated>, tid: u64) -> Result<()> {
         instructions::init_profile_delegated::handler(ctx, tid)
