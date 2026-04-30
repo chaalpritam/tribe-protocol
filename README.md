@@ -4,6 +4,18 @@ Solana programs (Anchor) for decentralized social identity and graph.
 
 Tribe is a fully-owned, open social protocol on Solana. This repo contains twelve on-chain programs covering identity, app keys, usernames, the social graph (with ER delegation), hub discovery, on-chain tip receipts, crowdfund campaigns with escrow, local tasks with optional reward escrow, globally-owned channel records, trustless karma aggregation, one-vote-per-TID polls, and events with one-RSVP-per-TID.
 
+## TODO
+
+- [ ] **Ship `social-graph::update_sequencer`** — branch `feat/social-graph-rotate-sequencer` (commit `ab8565e`) adds an admin-gated rotation instruction + `scripts/rotate-sequencer.ts`. Deploy with:
+  ```bash
+  git checkout feat/social-graph-rotate-sequencer
+  anchor build -p social_graph
+  anchor deploy --provider.cluster devnet -p social_graph
+  ```
+  If `cargo-build-sbf` complains about `Cargo.lock` lockfile v4, either regenerate the lock with the matching toolchain (`rm Cargo.lock && anchor build`) or upgrade the SBF toolchain. Requires the program's upgrade authority (existing `SequencerConfig` PDA carries over).
+- [ ] After deploy: add `update_sequencer` to the social-graph `Instructions` cell below, merge the branch, delete it.
+- [ ] Use `pnpm ts-node scripts/rotate-sequencer.ts --new-sequencer <keypair.json>` whenever the ER server wallet needs to change. Admin signer defaults to `~/.config/solana/id.json`; pass `--dry-run` first to verify the resolved PDA + new authority before sending.
+
 ## Programs
 
 | Program | Program ID | Instructions |
