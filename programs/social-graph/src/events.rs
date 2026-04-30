@@ -16,3 +16,9 @@ pub struct Unfollowed {
     pub follower_tid: u64,
     pub following_tid: u64,
 }
+
+#[event]
+pub struct SequencerRotated {
+    pub previous_authority: Pubkey,
+    pub new_authority: Pubkey,
+}
