@@ -253,7 +253,7 @@ Note: all sizes include the 8-byte Anchor discriminator.
 # Install JS dependencies
 pnpm install
 
-# Build all five programs
+# Build all programs
 anchor build
 
 # Run the full test suite (uses a local validator)
@@ -373,10 +373,12 @@ tribe-protocol/
 
 | Repo | Description |
 |------|-------------|
-| [tribe-sdk](../tribe-sdk) | TypeScript SDK -- identity, social graph, tweet clients |
-| [tribe-hub](../tribe-hub) | Decentralized hub -- tweet storage, indexing, gossip sync |
-| [tribe-er-server](../tribe-er-server) | Ephemeral Rollup sequencer -- instant follows, batched L1 settlement |
-| [tribe-app](../tribe-app) | Next.js frontend -- 10 pages with multi-node failover |
+| [tribe-sdk](../tribe-sdk) | TypeScript SDK — identity, social graph, all message clients |
+| [tribe-hub](../tribe-hub) | Decentralized hub — message storage, indexing, gossip sync |
+| [tribe-er-server](../tribe-er-server) | Ephemeral Rollup sequencer — instant follows, batched L1 settlement |
+| [tribe-app](../tribe-app) | Next.js frontend — reference client with multi-node failover |
+| [tribeapp.wtf](../tribeapp.wtf) | Consumer-facing web app + landing page |
+| [tribe-ios](../tribe-ios) | Native SwiftUI iOS client |
 
 ## License
 
